@@ -1,7 +1,9 @@
 package ImageHoster.model;
 
 import javax.persistence.*;
+import java.util.ArrayList;
 import java.util.Date;
+import java.util.List;
 
 @Entity
 @Table(name = "images")
@@ -33,6 +35,9 @@ public class Image {
     @ManyToOne(fetch = FetchType.EAGER)
     @JoinColumn(name = "user_id")
     private User user;
+
+    @ManyToMany(fetch = FetchType.LAZY)
+    private List<Tag> tags = new ArrayList<>();
 
     public Image () { }
 
@@ -92,5 +97,13 @@ public class Image {
 
     public void setUser(User user) {
         this.user = user;
+    }
+
+    public List<Tag> getTags() {
+        return tags;
+    }
+
+    public void setTags(List<Tag> tags) {
+        this.tags = tags;
     }
 }

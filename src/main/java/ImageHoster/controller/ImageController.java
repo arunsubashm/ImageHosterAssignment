@@ -2,8 +2,10 @@ package ImageHoster.controller;
 
 import ImageHoster.HardCodedImage;
 import ImageHoster.model.Image;
+import ImageHoster.model.Tag;
 import ImageHoster.model.User;
 import ImageHoster.service.ImageService;
+import ImageHoster.service.TagService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
@@ -15,9 +17,7 @@ import org.springframework.web.multipart.MultipartFile;
 
 import javax.servlet.http.HttpSession;
 import java.io.IOException;
-import java.util.Base64;
-import java.util.Date;
-import java.util.List;
+import java.util.*;
 
 @Controller
 public class ImageController {
@@ -27,6 +27,9 @@ public class ImageController {
 
     @Autowired
     private HardCodedImage hardCodedImage;
+
+    @Autowired
+    private TagService tagService;
 
     @RequestMapping("images")
     public String getUserImages(Model model) {
@@ -43,7 +46,10 @@ public class ImageController {
     public String showImage(@PathVariable ("title") String title, Model model) {
 
         Image image = imageService.getImageByTitle(title);
+
         model.addAttribute("image", image);
+        model.addAttribute("tags",image.getTags());
+
         return "images/image";
     }
 
@@ -53,14 +59,18 @@ public class ImageController {
     }
 
     @RequestMapping(value = "/images/upload", method = RequestMethod.POST)
-    public String createImage(@RequestParam("file") MultipartFile file, Image newImage, Model model, HttpSession session) throws IOException {
+    public String createImage(@RequestParam("file") MultipartFile file, @RequestParam("tags") String tags,
+                              Image newImage, Model model, HttpSession session) throws IOException {
 
         Date date = new Date();
+        List<Tag> tagL;
 
         User user = (User) session.getAttribute("loggeduser");
+        tagL = findOrCreateTags(tags);
         newImage.setImageFile(convertUploadedFileToBase64(file));
         newImage.setDate(date);
         newImage.setUser(user);
+        newImage.setTags(tagL);
 
         imageService.uploadImage(newImage);
 
@@ -71,15 +81,19 @@ public class ImageController {
     public String editImage(@RequestParam("imageId") Integer imageId, Model model) {
 
         Image image = imageService.getImage(imageId);
+        String tags = convertTagsToString(image.getTags());
         model.addAttribute("image", image);
+        model.addAttribute("tags",tags);
         return "images/edit";
     }
 
     @RequestMapping(value = "/editImage", method = RequestMethod.PUT)
     public String editImageSubmit(@RequestParam("file") MultipartFile file, @RequestParam("imageId") Integer imageId,
-                                  Image updatedImage, HttpSession session) throws IOException {
+                                  @RequestParam("tags") String tags, Image updatedImage, HttpSession session) throws IOException {
         Image image = imageService.getImage(imageId);
+        List<Tag> tagL;
         String updatedImageData = convertUploadedFileToBase64(file);
+        tagL = findOrCreateTags(tags);
 
         if (updatedImageData.isEmpty())
             updatedImage.setImageFile(image.getImageFile());
@@ -91,6 +105,7 @@ public class ImageController {
         User user = (User) session.getAttribute("loggeduser");
         updatedImage.setUser(user);
         updatedImage.setDate(new Date());
+        updatedImage.setTags(tagL);
 
         imageService.updateImage(updatedImage);
 
@@ -107,4 +122,36 @@ public class ImageController {
     private String convertUploadedFileToBase64(MultipartFile file) throws IOException {
         return Base64.getEncoder().encodeToString(file.getBytes());
     }
+
+    private List<Tag> findOrCreateTags(String tagNames) {
+        StringTokenizer st = new StringTokenizer(tagNames, ",");
+        List<Tag> tags = new ArrayList<>();
+
+        while (st.hasMoreTokens()) {
+            String tagName = st.nextToken().trim();
+            Tag tag = tagService.getTagByName(tagName);
+
+            if (tag == null) {
+                Tag newTag = new Tag(tagName);
+                tag = tagService.createTag(newTag);
+            }
+            tags.add(tag);
+        }
+        return tags;
+    }
+
+    private String convertTagsToString(List<Tag> tags) {
+
+        StringBuilder tagString = new StringBuilder();
+
+        for (int i = 0; i <= tags.size() - 2; i++) {
+            tagString.append(tags.get(i).getName()).append(",");
+        }
+
+        Tag lastTag = tags.get(tags.size() - 1);
+        tagString.append(lastTag.getName());
+
+        return tagString.toString();
+    }
+
 }
